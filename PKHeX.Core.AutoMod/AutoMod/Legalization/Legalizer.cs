@@ -236,14 +236,298 @@ public static class Legalizer
     /// <returns>LegalizationResult</returns>
     public static AsyncLegalizationResult TryAPIConvert(this ITrainerInfo tr, IBattleTemplate set, PKM template, bool nativeOnly = false, IEncounterable? enc = null)
     {
-        var almres = tr.GetLegalFromTemplateTimeout(template, set, nativeOnly,enc: enc);
+        // Store original values to preserve
+        var originalNickname = template.Nickname;
+        var originalBall = template.Ball;
+        var originalMetDate = template.MetDate;
+        var isNicknamed = template.IsNicknamed;
+        var originalFriendship = template.CurrentFriendship;
+        var originalForm = template.Form;
+        var originalSpecies = template.Species;
+        
+        // Store original trainer data
+        var originalOT = template.OriginalTrainerName;
+        var originalTID16 = template.TID16;
+        var originalSID16 = template.SID16;
+        var originalOTGender = template.OriginalTrainerGender;
+        
+        // Additional encounter data
+        var originalMetLocation = template.MetLocation;
+        var originalEggLocation = template.EggLocation;
+        var originalMetLevel = template.MetLevel;
+        var originalCharacteristic = template.Characteristic;
+        
+        // Store original moves
+        var originalMoves = new ushort[4];
+        template.GetMoves(originalMoves);
+
+        var almres = tr.GetLegalFromTemplateTimeout(template, set, nativeOnly, enc: enc);
         if (almres.Status != LegalizationResult.Regenerated)
             return almres;
 
         var pkm = almres.Created;
+        
+        // Get the legality analysis for the original and new PKM
+        var originalLA = new LegalityAnalysis(template);
+        var newLA = new LegalityAnalysis(pkm);
+        
+        // Get encounter info
+        var originalEncounter = originalLA.EncounterOriginal;
+        var newEncounter = newLA.EncounterOriginal;
+        
+        // Only preserve original data if the original Pokémon was legal
+        // or if we're using the same encounter type
+        bool originalWasLegal = originalLA.Valid;
+        bool sameEncounterType = originalEncounter?.GetType() == newEncounter?.GetType();
+        bool canPreserveMetData = originalWasLegal || sameEncounterType;
+        
+        // Determine if this is a legendary, mythical, or other special Pokémon
+        bool isSpecialPokemon = EntityInfo.IsSpecialEncounter(pkm.Species);
+        bool canHatchFromEgg = !EntityInfo.IsEggIncompatible(pkm.Species, pkm.Form, tr.Generation);
+        
+        // Special handling for legendaries, mythicals, and special encounters
+        if (isSpecialPokemon)
+        {
+            // For special Pokémon, only preserve metadata if the original was legal
+            // or if it's the same encounter type
+            if (canPreserveMetData)
+            {
+                // We can preserve the met data
+                pkm.MetLocation = originalMetLocation;
+                pkm.MetLevel = originalMetLevel;
+                
+                // Only preserve ball if it would be legal
+                var tempBall = pkm.Clone();
+                tempBall.Ball = originalBall;
+                var ballLA = new LegalityAnalysis(tempBall);
+                if (ballLA.Valid)
+                    pkm.Ball = originalBall;
+            }
+        }
+        else if (!canHatchFromEgg && originalEggLocation == 0)
+        {
+            // For non-egg-compatible Pokémon that weren't from eggs
+            if (canPreserveMetData)
+            {
+                pkm.MetLocation = originalMetLocation;
+                pkm.MetLevel = originalMetLevel;
+                pkm.Ball = originalBall;
+            }
+        }
+        else
+        {
+            // For regular Pokémon
+            pkm.MetDate = originalMetDate;
+            
+            // Check if original ball is legal
+            var tempBall = pkm.Clone();
+            tempBall.Ball = originalBall;
+            var ballLA = new LegalityAnalysis(tempBall);
+            if (ballLA.Valid)
+                pkm.Ball = originalBall;
+        }
+        
+        // Restore original values that don't affect legality
+        if (isNicknamed)
+        {
+            pkm.Nickname = originalNickname;
+            pkm.IsNicknamed = true;
+        }
+        
+        pkm.CurrentFriendship = originalFriendship;
+        pkm.Characteristic = originalCharacteristic;
+        
+        // Only restore form if the species hasn't changed and it's not a form that affects legality
+        if (pkm.Species == originalSpecies)
+        {
+            var pi = pkm.PersonalInfo;
+            bool isFormChangeable = pi.HasForms || pkm.Species is (int)Species.Silvally or (int)Species.Arceus;
+            bool isBattleOnlyForm = FormInfo.IsBattleOnlyForm(pkm.Species, originalForm, pkm.Format);
+            
+            if (isFormChangeable && !isBattleOnlyForm)
+            {
+                // Check if the original form would be legal
+                var tempPkm = pkm.Clone();
+                tempPkm.Form = originalForm;
+                var formLegalityAnalysis = new LegalityAnalysis(tempPkm);
+                
+                // Only restore original form if it would be legal
+                if (formLegalityAnalysis.Valid)
+                    pkm.Form = originalForm;
+            }
+        }
+        
+        // Restore original trainer data
+        pkm.OriginalTrainerName = originalOT;
+        pkm.TID16 = originalTID16;
+        pkm.SID16 = originalSID16;
+        pkm.OriginalTrainerGender = originalOTGender;
+        
+        // Handle moves - try to preserve original moves if they're legal
+        var legalMoveSet = new MoveSet(pkm);
+        var originalMoveSet = new MoveSet(template);
+
+        // Verify each original move and use it if it's legal in the new Pokémon
+        for (int i = 0; i < 4; i++)
+        {
+            if (originalMoveSet.Moves[i] == 0) // Skip empty moves
+                continue;
+                
+            // Create a test Pokémon with the move we want to verify
+            var testPkm = pkm.Clone();
+            testPkm.SetMove(i, originalMoveSet.Moves[i]);
+            var legality = new LegalityAnalysis(testPkm);
+            
+            // Check if the move info for this slot is valid
+            if (legality.Info.Moves[i].Valid)
+            {
+                // Move is valid, so use it
+                legalMoveSet.Moves[i] = originalMoveSet.Moves[i];
+                
+                // Also copy the PP if possible
+                legalMoveSet.Moves_PP[i] = Math.Min(
+                    originalMoveSet.Moves_PP[i], 
+                    testPkm.GetMovePP(originalMoveSet.Moves[i], 0)
+                );
+            }
+        }
+        
+        // Apply the legal moves to the Pokémon
+        legalMoveSet.ApplyTo(pkm);
+        
+        // Set trainer data after everything else
         var trainer = TrainerSettings.GetSavedTrainerData(pkm, tr);
         pkm.SetAllTrainerData(trainer);
+        
+        // Make sure the result is still legal
+        var finalLA = new LegalityAnalysis(pkm);
+        
+        // If our modifications made the Pokémon illegal, revert to the original legalized version
+        if (!finalLA.Valid)
+        {
+            return almres;
+        }
+        
         return new AsyncLegalizationResult(pkm, almres.Status);
+    }
+
+    /// <summary>
+    /// Helper class to manage move sets easily
+    /// </summary>
+    private class MoveSet
+    {
+        public readonly ushort[] Moves = new ushort[4];
+        public readonly int[] Moves_PP = new int[4];
+        
+        public MoveSet(PKM pkm)
+        {
+            Moves[0] = pkm.Move1;
+            Moves[1] = pkm.Move2;
+            Moves[2] = pkm.Move3;
+            Moves[3] = pkm.Move4;
+            
+            Moves_PP[0] = pkm.Move1_PP;
+            Moves_PP[1] = pkm.Move2_PP;
+            Moves_PP[2] = pkm.Move3_PP;
+            Moves_PP[3] = pkm.Move4_PP;
+        }
+        
+        public void ApplyTo(PKM pkm)
+        {
+            pkm.Move1 = Moves[0];
+            pkm.Move2 = Moves[1];
+            pkm.Move3 = Moves[2];
+            pkm.Move4 = Moves[3];
+            
+            pkm.Move1_PP = (byte)Moves_PP[0];
+            pkm.Move2_PP = (byte)Moves_PP[1];
+            pkm.Move3_PP = (byte)Moves_PP[2];
+            pkm.Move4_PP = (byte)Moves_PP[3];
+        }
+    }
+
+    /// <summary>
+    /// Helper class with utility methods for entity information
+    /// </summary>
+    private static class EntityInfo
+    {
+        /// <summary>
+        /// Checks if a species is considered a special encounter (legendary, mythical, etc.)
+        /// </summary>
+        public static bool IsSpecialEncounter(ushort species)
+        {
+            return IsLegendary(species) || IsMythical(species) || IsSubLegendary(species);
+        }
+        
+        /// <summary>
+        /// Checks if a species is a legendary Pokémon
+        /// </summary>
+        public static bool IsLegendary(ushort species) => species switch
+        {
+            144 or 145 or 146 or 150 or // Kanto
+            249 or 250 or // Johto
+            377 or 378 or 379 or 380 or 381 or 382 or 383 or 384 or // Hoenn
+            480 or 481 or 482 or 483 or 484 or 485 or 486 or 487 or 488 or // Sinnoh
+            638 or 639 or 640 or 641 or 642 or 643 or 644 or 646 or // Unova
+            716 or 717 or 718 or // Kalos
+            785 or 786 or 787 or 788 or 789 or 790 or 791 or 792 or 800 or // Alola
+            888 or 889 or 890 or 891 or 892 or 894 or 895 or 896 or 897 or 898 or // Galar
+            905 or 1001 or 1002 or 1003 or 1007 or 1008 => true, // Paldea
+            _ => false
+        };
+        
+        /// <summary>
+        /// Checks if a species is a mythical Pokémon
+        /// </summary>
+        public static bool IsMythical(ushort species) => species switch
+        {
+            151 or // Mew
+            251 or // Celebi
+            385 or // Jirachi
+            386 or // Deoxys
+            489 or 490 or 491 or 492 or 493 or // Sinnoh
+            494 or 647 or 648 or 649 or // Unova
+            719 or 720 or 721 or // Kalos
+            801 or 802 or // Alola
+            807 or 808 or 809 or // Let's Go
+            893 => true, // Galar
+            _ => false
+        };
+        
+        /// <summary>
+        /// Checks if a species is a sub-legendary Pokémon
+        /// </summary>
+        public static bool IsSubLegendary(ushort species) => species switch
+        {
+            // These are typically static encounters
+            // We'll consider Ultra Beasts and Kubfu/Urshifu as "sub-legendaries" as well
+            in > 772 and < 800 or // Ultra Beasts
+            in > 144 and < 146 or // Birds
+            in > 243 and < 246 or // Beasts
+            in > 375 and < 378 or // Regis
+            in > 480 and < 487 or // Musketeers, Lati@s, etc
+            in > 637 and < 641 or // Swords of Justice
+            in > 784 and < 788 or // Tapus
+            in > 104 and < 115 or // Various others
+            in > 903 and < 1000 => true, // Gen 9+
+            _ => false
+        };
+        
+        /// <summary>
+        /// Checks if a species is incompatible with being hatched from an egg
+        /// </summary>
+        public static bool IsEggIncompatible(ushort species, byte form, int generation)
+        {
+            // Legendaries, mythicals, and most form-specific Pokémon can't breed
+            if (IsLegendary(species) || IsMythical(species) || IsSubLegendary(species))
+                return true;
+                
+            if (species is 132 or 774) // Ditto or Minior
+                return true;
+                
+            // Form edge cases that can't breed
+            return form > 0 && species is 201 or 421 or 422 or 423 or 550 or 555 or 585 or 586 or 641 or 642 or 645 or 647 or 648 or 649 or 670 or 671 or 710 or 711 or 741 or 745 or 746 or 747 or 748 or 773 or 774 or 778 or 849 or 854 or 855 or 875 or 876 or 877 or 888 or 889 or 892;
+        }
     }
 
     /// <summary>

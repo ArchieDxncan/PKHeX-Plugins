@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
 using PKHeX.Core;
+using PKHeX.Core.AutoMod;
 
 namespace AutoModPlugins;
 
