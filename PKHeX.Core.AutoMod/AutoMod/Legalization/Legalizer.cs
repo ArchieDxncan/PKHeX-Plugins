@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using static PKHeX.Core.AutoMod.APILegality;
+using PKHeX.Core;
 
 namespace PKHeX.Core.AutoMod;
 
@@ -34,10 +35,28 @@ public static class Legalizer
     public static PKM Legalize(this ITrainerInfo tr, PKM pk, LegalityAnalysis? la = null)
     {
         var set = new ShowdownSet(pk); //Regen Template may carry illegal traits, Use basic Showdown set to revert to a legal template.
-        var almres = tr.GetLegalFromSet(set,pk,la?.EncounterOriginal); //keep the current pkm as template
+        var almres = tr.GetLegalFromSet(set, pk, la?.EncounterOriginal); //keep the current pkm as template
         var result = almres.Status;
+        
+        // If legalization failed, try again with the Pokemon's original generation
+        if (result == LegalizationResult.Failed)
+        {
+            var originalGen = GetOriginalGeneration(pk.Species);
+            if (originalGen != tr.Generation)
+            {
+                var originalTr = TrainerSettings.GetSavedTrainerData(originalGen);
+                var retrySet = new ShowdownSet(pk);
+                var retryRes = originalTr.GetLegalFromSet(retrySet, pk, la?.EncounterOriginal);
+                if (retryRes.Status == LegalizationResult.Regenerated)
+                {
+                    return retryRes.Created;
+                }
+            }
+        }
+        
         return result == LegalizationResult.VersionMismatch ? throw new MissingMethodException("PKHeX and Plugins have a version mismatch") : almres.Created;
     }
+
     /// <summary>
     /// Tries to regenerate the <see cref="pk"/> into a valid pkm. For Blazor WASM.
     /// </summary>
@@ -326,6 +345,16 @@ public static class Legalizer
             if (ballLA.Valid)
                 pkm.Ball = originalBall;
         }
+
+        // Additional ball preservation for static encounters
+        if (newEncounter?.GetType().Name.StartsWith("EncounterStatic") == true && originalBall != 0)
+        {
+            var tempBall = pkm.Clone();
+            tempBall.Ball = originalBall;
+            var ballLA = new LegalityAnalysis(tempBall);
+            if (ballLA.Valid)
+                pkm.Ball = originalBall;
+        }
         
         // Restore original values that don't affect legality
         if (isNicknamed)
@@ -335,7 +364,6 @@ public static class Legalizer
         }
         
         pkm.CurrentFriendship = originalFriendship;
-        pkm.Characteristic = originalCharacteristic;
         
         // Only restore form if the species hasn't changed and it's not a form that affects legality
         if (pkm.Species == originalSpecies)
@@ -501,15 +529,15 @@ public static class Legalizer
         {
             // These are typically static encounters
             // We'll consider Ultra Beasts and Kubfu/Urshifu as "sub-legendaries" as well
-            in > 772 and < 800 or // Ultra Beasts
-            in > 144 and < 146 or // Birds
-            in > 243 and < 246 or // Beasts
-            in > 375 and < 378 or // Regis
-            in > 480 and < 487 or // Musketeers, Lati@s, etc
-            in > 637 and < 641 or // Swords of Justice
-            in > 784 and < 788 or // Tapus
-            in > 104 and < 115 or // Various others
-            in > 903 and < 1000 => true, // Gen 9+
+            > 772 and < 800 or // Ultra Beasts
+            > 144 and < 146 or // Birds
+            > 243 and < 246 or // Beasts
+            > 375 and < 378 or // Regis
+            > 480 and < 487 or // Musketeers, Lati@s, etc
+            > 637 and < 641 or // Swords of Justice
+            > 784 and < 788 or // Tapus
+            > 104 and < 115 or // Various others
+            > 903 and < 1000 => true, // Gen 9+
             _ => false
         };
         
@@ -545,5 +573,24 @@ public static class Legalizer
                 emptySlots.Add(i);
         }
         return emptySlots;
+    }
+
+    /// <summary>
+    /// Gets the original generation a Pokemon was introduced in
+    /// </summary>
+    private static byte GetOriginalGeneration(ushort species)
+    {
+        return species switch
+        {
+            <= 151 => 1,  // Kanto
+            <= 251 => 2,  // Johto
+            <= 386 => 3,  // Hoenn
+            <= 493 => 4,  // Sinnoh
+            <= 649 => 5,  // Unova
+            <= 721 => 6,  // Kalos
+            <= 807 => 7,  // Alola
+            <= 898 => 8,  // Galar
+            _ => 9,       // Paldea
+        };
     }
 }

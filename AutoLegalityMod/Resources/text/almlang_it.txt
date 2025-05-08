@@ -36,9 +36,9 @@ LiveHeXUI.L_Block=Blocco:
 SimpleHexEditor=RAMEdit
 SimpleHexEditor.B_Update=Aggiorna
 
-Main.Menu_AutoLegality=Auto-Legality Mod
-Main.Menu_ExportBoxtoShowdown=Esporta Box per Showdown
-Main.Menu_PasteImporter=Importa con Auto-Legality Mod
+Main.Menu_AutoLegality=ArchieDxncan's Transporter
+Main.Menu_ExportBoxtoShowdown=Export Box to ALM Showdown Template
+Main.Menu_PasteImporter=Importa con ArchieDxncan's Transporter
 Main.Menu_PKSMBank=Strumenti per Banca PKSM
 Main.Menu_CreatePKSMBank=Unisci PKM in Banca PKSM
 Main.Menu_ExportPKSMBank=Esporta Banca PKSM in PKM

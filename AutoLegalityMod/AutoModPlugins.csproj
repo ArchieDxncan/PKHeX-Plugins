@@ -3,6 +3,7 @@
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AssemblyName>ArchieDxncan</AssemblyName>
   </PropertyGroup>
   <PropertyGroup>
     <DebugType>portable</DebugType>

@@ -53,7 +53,7 @@
             this.MinimumSize = new System.Drawing.Size(350, 367);
             this.Name = "ALMSettings";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Auto Legality Plugin Settings";
+            this.Text = "ArchieDxncan's Transporter Settings";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.ALMSettings_FormClosing);
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.SettingsEditor_KeyDown);
             this.ResumeLayout(false);

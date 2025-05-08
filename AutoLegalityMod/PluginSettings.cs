@@ -25,11 +25,11 @@ public class PluginSettings
     // Trainer
     [Category(Trainer)]
     [Description("Allows overriding trainer data with \"OT\", \"TID\", \"SID\", and \"OTGender\" as part of a Showdown set.")]
-    public bool AllowTrainerOverride { get; set; } = true;
+    public bool AllowTrainerOverride { get; set; } = false;
 
     [Category(Trainer)]
     [Description("Enables use of custom trainer data based on the \"trainers\" folder.")]
-    public bool UseTrainerData { get; set; } = true;
+    public bool UseTrainerData { get; set; } = false;
 
     [Category(Trainer)]
     [Description("Default OT Name to use while generating Pokémon.")]
@@ -53,119 +53,112 @@ public class PluginSettings
     public bool USBBotBasePreferred { get; set; } = false;
 
     [Category(Connection)]
-    [Description("Stores pointer addresses to cache for faster lookups.")]
+    [Description("Uses cached pointers for LiveHeX.")]
     public bool UseCachedPointers { get; set; } = false;
-
-    // Customization
-    [Category(Customization)]
-    [Description("Allows overriding Poké Ball with \"Ball\" in a Showdown set.")]
-    public bool ForceSpecifiedBall { get; set; } = true;
-
-    [Category(Customization)]
-    [Description(
-        "If enabled, tries to generate a Pokémon based on PrioritizeGameVersion first."
-    )]
-    public bool PrioritizeGame { get; set; } = false;
-
-    [Category(Customization)]
-    [Description("Setting this to \"Any\" prioritizes the current save game, and setting a specific game prioritizes that instead.")]
-    public GameVersion PriorityGameVersion { get; set; } = GameVersion.Any;
-
-    [Category(Customization)]
-    [Description("Adds all ribbons that are legal according to PKHeX legality.")]
-    public bool SetAllLegalRibbons { get; set; } = true;
-
-    [Category(Customization)]
-    [Description("Sets all past-generation Pokémon as Battle Ready for games that support it.")]
-    public bool SetBattleVersion { get; set; } = true;
-
-    [Category(Customization)]
-    [Description("Attempts to choose a matching Poké Ball based on Pokémon color.")]
-    public bool SetMatchingBalls { get; set; } = true;
-
-    [Category(Customization)]
-    [Description("Force Showdown sets with level 50 to level 100")]
-    public bool ForceLevel100for50 { get; set; } = true;
-
-    [Category(Customization)]
-    [Description("Export format for ALM Showdown Template")]
-    public BattleTemplateDisplayStyle ExportFormat { get; set; } = BattleTemplateDisplayStyle.Showdown;
 
     // Legality
     [Category(Legality)]
-    [Description("Global timeout per Pokémon being generated (in seconds)")]
+    [Description("Forces the specified ball when generating Pokémon.")]
+    public bool ForceSpecifiedBall { get; set; } = true;
+
+    [Category(Legality)]
+    [Description("Prioritizes the specified game version when generating Pokémon.")]
+    public bool PrioritizeGame { get; set; } = true;
+
+    [Category(Legality)]
+    [Description("The game version to prioritize when generating Pokémon.")]
+    public GameVersion PriorityGameVersion { get; set; } = (GameVersion)72;
+
+    [Category(Legality)]
+    [Description("Sets all legal ribbons on generated Pokémon.")]
+    public bool SetAllLegalRibbons { get; set; } = false;
+
+    [Category(Legality)]
+    [Description("Sets the battle version on generated Pokémon.")]
+    public bool SetBattleVersion { get; set; } = true;
+
+    [Category(Legality)]
+    [Description("Sets matching balls on generated Pokémon.")]
+    public bool SetMatchingBalls { get; set; } = false;
+
+    [Category(Legality)]
+    [Description("Forces level 100 for level 50 Pokémon.")]
+    public bool ForceLevel100for50 { get; set; } = true;
+
+    // Customization
+    [Category(Customization)]
+    [Description("The format to use when exporting Pokémon.")]
+    public BattleTemplateDisplayStyle ExportFormat { get; set; } = (BattleTemplateDisplayStyle)0;
+
+    [Category(Customization)]
+    [Description("Timeout in seconds for API calls.")]
     public int Timeout { get; set; } = 15;
 
-    [Category(Legality)]
-    [Description("Defines the order in which Pokémon encounters are prioritized")]
-    public List<EncounterTypeGroup> PrioritizeEncounters { get; set; } =
-    [
-        EncounterTypeGroup.Egg,
-        EncounterTypeGroup.Static,
-        EncounterTypeGroup.Trade,
-        EncounterTypeGroup.Slot,
-        EncounterTypeGroup.Mystery,
-    ];
+    [Category(Customization)]
+    [Description("Prioritized encounter types when generating Pokémon.")]
+    public List<EncounterTypeGroup> PrioritizeEncounters { get; set; } = new()
+    {
+        (EncounterTypeGroup)1,
+        (EncounterTypeGroup)4,
+        (EncounterTypeGroup)8,
+        (EncounterTypeGroup)16,
+        (EncounterTypeGroup)2
+    };
 
-    //  [Category(Legality)]
-    // [Description("Disabling this will force ALM to not generate Pokemon which require a HOME tracker.")]
-    //public bool AllowHOMETransferGeneration { get; set; } = true;
-
-    [Category(Legality)]
-    [Description("Produces an Easter Egg Pokémon if the provided set is illegal.")]
+    [Category(Customization)]
+    [Description("Enables easter eggs in the plugin.")]
     public bool EnableEasterEggs { get; set; } = true;
 
-    // Living Dex
-    [Category(LivingDex)]
-    [Description("Generate all forms of the Pokémon. Note that some generations may not have enough box space for all forms.")]
-    public bool IncludeForms { get; set; } = false;
+    [Category(Customization)]
+    [Description("Includes alternate forms when generating Pokémon.")]
+    public bool IncludeForms { get; set; } = true;
 
-    [Category(LivingDex)]
-    [Description("Try to generate the shiny version of the Pokémon if possible.")]
+    [Category(Customization)]
+    [Description("Sets shiny status on generated Pokémon.")]
     public bool SetShiny { get; set; } = false;
 
-    [Category(LivingDex)]
-    [Description("Try to generate the alpha version of the Pokémon if possible.")]
+    [Category(Customization)]
+    [Description("Sets alpha status on generated Pokémon.")]
     public bool SetAlpha { get; set; } = false;
 
-    [Category(LivingDex)]
-    [Description("Only generate Pokémon natively available in the game version pair.")]
-    public bool NativeOnly { get; set; } = true;
+    [Category(Customization)]
+    [Description("Only uses native encounters when generating Pokémon.")]
+    public bool NativeOnly { get; set; } = false;
 
-    [Category(TransferDex)]
-    [Description("Generate Transfer Living Dex destination game")]
-    public GameVersion TransferVersion { get; set; } = GameVersion.VL;
+    [Category(Customization)]
+    [Description("The version to use for transfers.")]
+    public GameVersion TransferVersion { get; set; } = (GameVersion)51;
 
-    // Miscellaneous
-    [Category(Miscellaneous)]
-    [Description("Used for \"Generate Smogon Sets\". If set to true, ALM will ask for approval for each set before attempting to generate it.")]
+    [Category(Customization)]
+    [Description("Prompts for Smogon import.")]
     public bool PromptForSmogonImport { get; set; } = false;
 
-    [Category(Miscellaneous)]
-    [Description("Sets markings on the Pokémon based on IVs.")]
+    [Category(Customization)]
+    [Description("Uses markings on generated Pokémon.")]
     public bool UseMarkings { get; set; } = true;
 
-    [Category(Miscellaneous)]
-    [Description("Sets IVs of 31 to blue and 30 to red if enabled. Otherwise, sets IVs of 31 to blue and 0 to red.")]
+    [Category(Customization)]
+    [Description("Uses competitive markings on generated Pokémon.")]
     public bool UseCompetitiveMarkings { get; set; } = true;
 
-    [Category(Miscellaneous)]
-    [Description("Sets the types to use when generating a random team of Pokémon.")]
+    [Category(Customization)]
+    [Description("Random types to use when generating Pokémon.")]
     public MoveType[] RandomTypes { get; set; } = [];
 
     // Development
     [Category(Development)]
-    [Description("If enabled, ignores version mismatch warnings until the next PKHeX.Core release. Also bypasses Switch connection checks.")]
+    [Description("Enables developer mode.")]
     public bool EnableDevMode { get; set; } = false;
 
-    [Browsable(false)]
+    [Category(Development)]
+    [Description("Latest allowed version.")]
     public string LatestAllowedVersion { get; set; } = "0.0.0.0";
 
     public void Save()
     {
         JsonSerializerOptions options = new() { WriteIndented = true };
         string output = JsonSerializer.Serialize(this, options);
-        using StreamWriter sw = new(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "almconfig.json"));
+        using StreamWriter sw = new(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "archiedxncan_config.json"));
         sw.WriteLine(output);
     }
 }
